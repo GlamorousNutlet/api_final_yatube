@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from .models import Post, Comment, Follow, Group
 
-
 class PostSerializer(serializers.ModelSerializer):
     author = serializers.ReadOnlyField(source='author.username')
 
@@ -20,11 +19,12 @@ class CommentSerializer(serializers.ModelSerializer):
 
 
 class FollowingSerializer(serializers.ModelSerializer):
-    user = serializers.ReadOnlyField(source='user.username')
-    following = serializers.CharField(source='following.username', read_only=True)
+    user = serializers.CharField(source='user.username', read_only=True)
+    following = serializers.CharField(source='following.username',
+                                      read_only=True)
     class Meta:
-        fields = ('user', 'following')
         model = Follow
+        fields = ('user', 'following',)
 
 
 class GroupSerializer(serializers.ModelSerializer):
