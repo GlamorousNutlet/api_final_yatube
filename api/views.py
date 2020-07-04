@@ -1,10 +1,12 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status, filters
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 
 from .models import Post, Comment, Follow, Group
-from .serializers import PostSerializer, CommentSerializer, FollowingSerializer, GroupSerializer
+from .serializers import (PostSerializer, CommentSerializer,
+                          FollowingSerializer, GroupSerializer)
 
 class PostViewSet(viewsets.ModelViewSet):
     serializer_class = PostSerializer
@@ -17,16 +19,8 @@ class PostViewSet(viewsets.ModelViewSet):
             group=self.request.query_params.get('group')
         )
 
-    def create(self, request):
-        if request.user.is_authenticated:
-            serializer = PostSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save(author=request.user)
-                return Response(serializer.data,
-                                status=status.HTTP_201_CREATED)
-            return Response(serializer.data,
-                            status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_403_BAD_FORBIDDEN)
+    def perform_create(self, serializer):
+            serializer.save(author=self.request.user)
 
     def update(self, request, *args, **kwargs):
         post = self.get_object()
@@ -87,22 +81,20 @@ class FollowViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['=following__username', '=user__username']
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        following = self.request.data.get('following')
-        if User.objects.filter(username=following).count() != 0:
-            following = User.objects.get(username=following)
+    def perform_create(self, serializer):
+        if User.objects.filter(username=self.request.data.get('following')).count() == 1:
+            print('im here if')
+            following = User.objects.get(username=self.request.data.get('following'))
             user = self.request.user
             followers = Follow.objects.filter(user=user,
                                               following=following).count()
             if followers > 0:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                raise ValidationError
             serializer.save(user=user, following=following)
-            headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data,
-                            status=status.HTTP_201_CREATED, headers=headers)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        else:
+            print(f'Im here')
+            print(User.objects.filter(username=self.request.data.get('following')).count())
+            raise ValidationError
 
 
 class GroupViewSet(viewsets.ModelViewSet):
